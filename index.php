@@ -1,4 +1,6 @@
-<?php
+<<?php
+// Triggered redeploy
+echo "Welcome to Popstar Bets!";
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
