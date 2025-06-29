@@ -1,6 +1,8 @@
 <?php
 session_start();
 
+file_put_contents("ussd_debug.txt", date("Y-m-d H:i:s") . " | " . print_r($_POST, true) . "\n", FILE_APPEND);
+
 $text = $_POST['text'] ?? '';
 $phone = $_POST['phoneNumber'] ?? '0727430534';
 $steps = explode("*", $text);
