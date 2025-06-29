@@ -27,11 +27,18 @@ if ($text == "") {
     $option = $steps[2];
 
     if ($option == "1") {
-        // ✅ Trigger M-Pesa STK Push simulation
-        $amount = 100; // Fixed for now; you can later ask the user for amount
-        stkPush($phone, $amount, 'deposit');
+        $amount = 100;
+
+        $mpesaResponse = stkPush($phone, $amount, 'deposit');
         logTransaction($pdo, $phone, 'deposit', $amount);
-        echo "END Deposit of KES $amount initiated. Approve the prompt on your phone.";
+
+        if (isset($mpesaResponse['ResponseCode']) && $mpesaResponse['ResponseCode'] == '0') {
+            echo "END Deposit of KES $amount initiated. Approve the prompt on your phone.";
+        } else {
+            // Save full Safaricom response to help debug
+            file_put_contents("mpesa_debug.txt", json_encode($mpesaResponse, JSON_PRETTY_PRINT) . "\n", FILE_APPEND);
+            echo "END Failed to launch. Kindly try again.";
+        }
 
     } elseif ($option == "2") {
         echo "END You selected Bet (coming next)";
