@@ -1,12 +1,12 @@
 <?php
-// Database connection details
-$host = 'localhost';
-$db   = 'ussd_betting';   // Change if your DB name is different
-$user = 'root';           // Default user for XAMPP
-$pass = '';               // Default has no password
+// Remote FreeSQLDatabase connection details
+$host = 'sql5.freesqldatabase.com';
+$db   = 'sql5787380';
+$user = 'sql5787380';
+$pass = 'RPn8MBxyad';
 $charset = 'utf8mb4';
 
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+$dsn = "mysql:host=$host;port=3306;dbname=$db;charset=$charset";
 
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Throw exceptions
