@@ -2,7 +2,7 @@
 session_start();
 
 $text = $_POST['text'] ?? '';
-$phone = $_POST['phoneNumber'] ?? '0727430534'; // Replace with actual phone if available
+$phone = $_POST['phoneNumber'] ?? '0727430534';
 $steps = explode("*", $text);
 
 require_once 'db.php';
@@ -23,17 +23,21 @@ switch (true) {
 
     case ($steps[0] == "1" && count($steps) == 2):
         $idNumber = $steps[1];
-        $result = registerUser($pdo, $phone, $idNumber);
-        $response = "CON Main Menu:\n1. Deposit Funds\n2. Today's Games & Bet\n3. Withdraw Winnings";
+        if (registerUser($pdo, $phone, $idNumber)) {
+            $response = "CON Main Menu:\n1. Deposit Funds\n2. Today's Games & Bet\n3. Withdraw Winnings";
+        } else {
+            $response = "END Registration failed. Please try again.";
+        }
         break;
 
     case ($steps[0] == "1" && count($steps) >= 3):
-        // After login, normal menu logic
         $action = $steps[2] ?? '';
+
         if ($action === "1") {
             stkPush($phone, 100, 'deposit');
             logTransaction($pdo, $phone, 'deposit', 100);
             $response = "END Deposit initiated. Approve the prompt on your phone.";
+        
         } elseif ($action === "2") {
             $games = getTodaysGames();
             if (empty($games)) {
@@ -48,14 +52,22 @@ switch (true) {
                 foreach ($games as $i => $g) {
                     $response .= ($i + 1) . ". {$g['home']} vs {$g['away']}\n";
                 }
+
             } elseif (count($steps) == 4) {
                 $index = intval($steps[3]) - 1;
+                if (!isset($games[$index])) {
+                    $response = "END Invalid game selection.";
+                    break;
+                }
+
                 $_SESSION['selected_game'] = $games[$index];
                 $response = "CON Bet on: {$games[$index]['home']} vs {$games[$index]['away']}\n1. Home Win\n2. Draw\n3. Away Win";
+
             } elseif (count($steps) == 5) {
                 $choice = intval($steps[4]);
                 $_SESSION['selected_choice'] = $choice;
                 $response = "CON Enter your stake amount (max KES 5000):";
+
             } elseif (count($steps) == 6) {
                 $stake = intval($steps[5]);
                 $game = $_SESSION['selected_game'];
@@ -72,6 +84,7 @@ switch (true) {
                     $response = "END Bet placed with stake of KES $stake. Thank you!";
                 }
             }
+
         } elseif ($action === "3") {
             $winnings = getWinnings($pdo, $phone);
             if ($winnings > 0) {
@@ -82,6 +95,7 @@ switch (true) {
             } else {
                 $response = "END No winnings to withdraw.";
             }
+
         } else {
             $response = "END Invalid option.";
         }
