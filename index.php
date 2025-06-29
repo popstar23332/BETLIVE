@@ -1,13 +1,4 @@
 <<?php
-// Triggered redeploy
-echo "Welcome to Popstar Bets!";
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// Log incoming requests
-file_put_contents("log.txt", date("Y-m-d H:i:s") . " " . print_r($_POST, true), FILE_APPEND);
 
 session_start();
 
