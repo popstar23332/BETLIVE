@@ -25,15 +25,24 @@ if ($text == "") {
     }
 } elseif ($steps[0] == "1" && count($steps) == 3) {
     $option = $steps[2];
+
     if ($option == "1") {
-        echo "END You selected Deposit";
+        // ✅ Trigger M-Pesa STK Push simulation
+        $amount = 100; // Fixed for now; you can later ask the user for amount
+        stkPush($phone, $amount, 'deposit');
+        logTransaction($pdo, $phone, 'deposit', $amount);
+        echo "END Deposit of KES $amount initiated. Approve the prompt on your phone.";
+
     } elseif ($option == "2") {
-        echo "END You selected Bet";
+        echo "END You selected Bet (coming next)";
+    
     } elseif ($option == "3") {
-        echo "END You selected Withdraw";
+        echo "END You selected Withdraw (coming next)";
+    
     } else {
         echo "END Invalid selection from menu.";
     }
+
 } else {
     echo "END Invalid input.";
 }
