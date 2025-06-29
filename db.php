@@ -1,3 +1,25 @@
+<?php
+// Connection details
+$host = 'sql5.freesqldatabase.com';
+$db   = 'sql5787380';
+$user = 'sql5787380';
+$pass = 'RPn8MBxyad';
+$charset = 'utf8mb4';
+
+$dsn = "mysql:host=$host;port=3306;dbname=$db;charset=$charset";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
+
+try {
+    $pdo = new PDO($dsn, $user, $pass, $options);
+} catch (PDOException $e) {
+    exit("END DB Error: " . $e->getMessage());
+}
+
+// ✅ Registration logic with logging
 function registerUser($pdo, $phone, $idNumber) {
     try {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE phone = ?");
@@ -21,3 +43,4 @@ function registerUser($pdo, $phone, $idNumber) {
         return false;
     }
 }
+?>
