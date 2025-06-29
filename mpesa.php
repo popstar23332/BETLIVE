@@ -1,9 +1,10 @@
 <?php
+
 function stkPush($phone, $amount, $type = 'deposit') {
     $accessToken = getMpesaAccessToken();
 
     $shortcode = "174379"; // Sandbox shortcode
-    $passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2c2c46b7e4d07c3b5b4f91f79e8e2c70"; // Replace with your passkey
+    $passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2c2c46b7e4d07c3b5b4f91f79e8e2c70";
     $timestamp = date("YmdHis");
     $password = base64_encode($shortcode . $passkey . $timestamp);
 
@@ -16,7 +17,7 @@ function stkPush($phone, $amount, $type = 'deposit') {
         "PartyA" => formatPhoneNumber($phone),
         "PartyB" => $shortcode,
         "PhoneNumber" => formatPhoneNumber($phone),
-        "CallBackURL" => "https://yourdomain.com/mpesa/callback", // Replace with your live callback
+        "CallBackURL" => "https://yourdomain.com/mpesa/callback", // Replace with your callback URL
         "AccountReference" => "PopStarBet",
         "TransactionDesc" => "$type payment"
     ];
@@ -36,7 +37,7 @@ function stkPush($phone, $amount, $type = 'deposit') {
 
     logMpesaRequest($phone, $amount, "STK_PUSH");
 
-    return json_decode($response, true);
+    return json_decode($response, true); // Useful if you want to check for success
 }
 
 function sendProfitToCompany($amount, $gameId) {
@@ -45,8 +46,8 @@ function sendProfitToCompany($amount, $gameId) {
     $url = "https://sandbox.safaricom.co.ke/mpesa/b2b/v1/paymentrequest";
 
     $payload = [
-        "InitiatorName" => "testapi", // Replace with your initiator username
-        "SecurityCredential" => "ENCRYPTED_PASSWORD", // Replace with encrypted credential
+        "InitiatorName" => "testapi",
+        "SecurityCredential" => "ENCRYPTED_PASSWORD", // Replace with real encrypted credential
         "CommandID" => "BusinessPayBill",
         "SenderIdentifierType" => "4",
         "ReceiverIdentifierType" => "4",
@@ -77,8 +78,8 @@ function sendProfitToCompany($amount, $gameId) {
 }
 
 function getMpesaAccessToken() {
-    $consumerKey = "YOUR_CONSUMER_KEY"; // Replace with your sandbox/live key
-    $consumerSecret = "YOUR_CONSUMER_SECRET"; // Replace with your key
+    $consumerKey = "YOUR_CONSUMER_KEY";       // Replace with your sandbox/live credentials
+    $consumerSecret = "YOUR_CONSUMER_SECRET"; // Replace with your sandbox/live credentials
     $credentials = base64_encode("$consumerKey:$consumerSecret");
 
     $url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
@@ -95,7 +96,6 @@ function getMpesaAccessToken() {
 }
 
 function formatPhoneNumber($phone) {
-    // Ensure phone starts with 2547...
     $phone = preg_replace("/[^0-9]/", "", $phone);
     if (substr($phone, 0, 1) === "0") {
         $phone = "254" . substr($phone, 1);
@@ -104,8 +104,12 @@ function formatPhoneNumber($phone) {
 }
 
 function logMpesaRequest($phone, $amount, $type) {
-    $file = fopen("mpesa_log.txt", "a");
-    fwrite($file, date("Y-m-d H:i:s") . ": $type of $amount for $phone\n");
-    fclose($file);
+    file_put_contents("mpesa_log.txt", date("Y-m-d H:i:s") . ": $type of $amount for $phone\n", FILE_APPEND);
+}
+
+// ✅ NEW: Logs all payment requests to the DB
+function logTransaction($pdo, $phone, $type, $amount) {
+    $stmt = $pdo->prepare("INSERT INTO payments (phone, amount, type) VALUES (?, ?, ?)");
+    $stmt->execute([$phone, $amount, $type]);
 }
 ?>
