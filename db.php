@@ -1,5 +1,5 @@
 <?php
-// Remote FreeSQLDatabase connection details
+// Remote MySQL connection via freesqldatabase.com
 $host = 'sql5.freesqldatabase.com';
 $db   = 'sql5787380';
 $user = 'sql5787380';
@@ -20,24 +20,24 @@ try {
     exit("END DB Error: " . $e->getMessage());
 }
 
-// Function to register a new user with auto-assigned user_number
+// ✅ Updated to return TRUE instead of END — this allows flow to continue
 function registerUser($pdo, $phone, $idNumber) {
     // Check if user already exists
     $stmt = $pdo->prepare("SELECT * FROM users WHERE phone = ?");
     $stmt->execute([$phone]);
     if ($stmt->rowCount() > 0) {
-        return "END You are already registered.";
+        return true; // already registered — proceed
     }
 
-    // Get max user_number and add 1, or start at 100000
+    // Get next user_number
     $stmt = $pdo->query("SELECT MAX(user_number) AS max_num FROM users");
     $max = $stmt->fetch()['max_num'];
     $newUserNumber = $max ? $max + 1 : 100000;
 
-    // Insert user with auto-assigned user_number
+    // Register user
     $stmt = $pdo->prepare("INSERT INTO users (phone, national_id, user_number) VALUES (?, ?, ?)");
     $stmt->execute([$phone, $idNumber, $newUserNumber]);
 
-    return "END Registration successful. Welcome to Pata Pata Bet.";
+    return true; // success — allow USSD to continue
 }
 ?>
