@@ -1,13 +1,12 @@
 <?php
-// ✅ Enable debugging (remove when going live)
+// ✅ Debug mode (disable when live)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// ✅ Log incoming request
-file_put_contents("ussd_debug.txt", date("Y-m-d H:i:s") . " " . print_r($_POST, true) . "\n", FILE_APPEND);
+// ✅ Log all inputs
+file_put_contents("ussd_debug.txt", date("Y-m-d H:i:s") . " " . print_r($_POST, true), FILE_APPEND);
 
-session_start();
 header('Content-type: text/plain');
 
 $text = $_POST['text'] ?? '';
@@ -16,13 +15,26 @@ $steps = explode("*", $text);
 
 require_once 'db.php';
 require_once 'mpesa.php';
-require_once 'football_api.php'; // must include getLeagues() and getGamesByLeague()
+require_once 'football_api.php';
 require_once 'sms.php';
 
-// Show supported leagues
-function displayLeagues() {
-    $leagues = getLeagues(); // returns array of league names
-    $_SESSION['leagues'] = $leagues;
+// 📁 Ensure cache directory exists
+if (!is_dir("cache")) mkdir("cache");
+
+// === Helper functions for file cache ===
+function saveData($phone, $key, $data) {
+    file_put_contents("cache/{$phone}_{$key}.json", json_encode($data));
+}
+
+function loadData($phone, $key) {
+    $file = "cache/{$phone}_{$key}.json";
+    return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+}
+
+// === League List ===
+function displayLeagues($phone) {
+    $leagues = getLeagues();
+    saveData($phone, "leagues", $leagues);
 
     $msg = "CON Choose League:\n";
     foreach ($leagues as $i => $name) {
@@ -31,17 +43,17 @@ function displayLeagues() {
     return $msg;
 }
 
-// Show games from selected league
-function displayGames($leagueIndex) {
-    $leagues = $_SESSION['leagues'] ?? [];
+// === Game List for Selected League ===
+function displayGames($phone, $leagueIndex) {
+    $leagues = loadData($phone, "leagues");
     if (!isset($leagues[$leagueIndex])) return "END Invalid league selection.";
 
     $league = $leagues[$leagueIndex];
-    $games = getGamesByLeague($league); // returns array of ['id', 'home', 'away']
+    $games = getGamesByLeague($league);
     if (empty($games)) return "END No games in $league.";
 
-    $_SESSION['selected_league'] = $league;
-    $_SESSION['games'] = $games;
+    saveData($phone, "games", $games);
+    saveData($phone, "league", $league);
 
     $msg = "CON Choose Game:\n";
     foreach ($games as $i => $g) {
@@ -50,7 +62,7 @@ function displayGames($leagueIndex) {
     return $msg;
 }
 
-// === FLOW HANDLER ===
+// === USSD Flow Handler ===
 if ($text == "") {
     echo "CON Welcome to Popstars Bet\n1. Log In";
 
@@ -59,25 +71,20 @@ if ($text == "") {
 
 } elseif ($steps[0] == "1" && count($steps) == 2) {
     $id = $steps[1];
-    try {
-        $success = registerUser($pdo, $phone, $id);
-        echo $success ? displayLeagues() : "END Registration failed. Try again.";
-    } catch (Exception $e) {
-        file_put_contents("ussd_debug.txt", "Register error: " . $e->getMessage() . "\n", FILE_APPEND);
-        echo "END System error. Please try again.";
-    }
+    $success = registerUser($pdo, $phone, $id);
+    echo $success ? displayLeagues($phone) : "END Registration failed. Try again.";
 
 } elseif ($steps[0] == "1" && count($steps) == 3) {
     $leagueIndex = intval($steps[2]) - 1;
-    echo displayGames($leagueIndex);
+    echo displayGames($phone, $leagueIndex);
 
 } elseif ($steps[0] == "1" && count($steps) == 4) {
     $gameIndex = intval($steps[3]) - 1;
-    $games = $_SESSION['games'] ?? [];
+    $games = loadData($phone, "games");
     if (!isset($games[$gameIndex])) {
         echo "END Invalid game.";
     } else {
-        $_SESSION['selected_game'] = $games[$gameIndex];
+        saveData($phone, "selected_game", $games[$gameIndex]);
         echo "CON Predict outcome:\n1. Home Win\n2. Draw\n3. Away Win";
     }
 
@@ -86,7 +93,7 @@ if ($text == "") {
     if (!in_array($choice, [1, 2, 3])) {
         echo "END Invalid prediction.";
     } else {
-        $_SESSION['selected_choice'] = $choice;
+        saveData($phone, "selected_choice", $choice);
         echo "CON Enter stake amount (max KES 5000):";
     }
 
@@ -95,21 +102,16 @@ if ($text == "") {
     if ($stake <= 0 || $stake > 5000) {
         echo "END Invalid stake amount.";
     } else {
-        $game = $_SESSION['selected_game'] ?? null;
-        $choice = $_SESSION['selected_choice'] ?? null;
+        $game = loadData($phone, "selected_game");
+        $choice = loadData($phone, "selected_choice");
 
         if (!$game || !$choice) {
             echo "END Session expired. Start again.";
         } else {
-            try {
-                placeBet($pdo, $phone, $game['id'], $choice, $stake);
-                deduct($pdo, $phone, $stake);
-                logTransaction($pdo, $phone, 'bet', $stake);
-                echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
-            } catch (Exception $e) {
-                file_put_contents("ussd_debug.txt", "Bet error: " . $e->getMessage() . "\n", FILE_APPEND);
-                echo "END Failed to place bet. Please try again.";
-            }
+            placeBet($pdo, $phone, $game['id'], $choice, $stake);
+            deduct($pdo, $phone, $stake);
+            logTransaction($pdo, $phone, 'bet', $stake);
+            echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
         }
     }
 
