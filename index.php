@@ -35,7 +35,6 @@ if ($text == "") {
         if (isset($mpesaResponse['ResponseCode']) && $mpesaResponse['ResponseCode'] == '0') {
             echo "END Deposit of KES $amount initiated. Approve the prompt on your phone.";
         } else {
-            // Save full Safaricom response to help debug
             file_put_contents("mpesa_debug.txt", json_encode($mpesaResponse, JSON_PRETTY_PRINT) . "\n", FILE_APPEND);
             echo "END Failed to launch. Kindly try again.";
         }
