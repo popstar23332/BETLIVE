@@ -67,4 +67,22 @@ function getMatchResult($gameId) {
     if ($homeGoals < $awayGoals) return 3; // Away Win
     return 2; // Draw
 }
-?>
+
+// ✅ New: Static list of supported leagues (order matters for menu)
+function getLeagues() {
+    return [
+        "Premier League",
+        "La Liga",
+        "Serie A",
+        "Bundesliga",
+        "Kenya Premier League"
+    ];
+}
+
+// ✅ New: Filter today's games by league name
+function getGamesByLeague($leagueName) {
+    $games = getTodaysGames();
+    return array_values(array_filter($games, function($g) use ($leagueName) {
+        return $g['league'] === $leagueName;
+    }));
+}
