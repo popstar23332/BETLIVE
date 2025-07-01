@@ -17,10 +17,8 @@ require_once 'mpesa.php';
 require_once 'football_api.php';
 require_once 'sms.php';
 
-// Ensure cache directory exists
 if (!is_dir("cache")) mkdir("cache");
 
-// === Cache Helpers ===
 function saveData($phone, $key, $data) {
     file_put_contents("cache/{$phone}_{$key}.json", json_encode($data));
 }
@@ -29,11 +27,9 @@ function loadData($phone, $key) {
     return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
 }
 
-// === Menu Builders ===
 function displayLeagues($phone) {
     $leagues = getLeagues();
     saveData($phone, "leagues", $leagues);
-
     $msg = "CON Choose League:\n";
     foreach ($leagues as $i => $name) {
         $msg .= ($i + 1) . ". " . $name . "\n";
@@ -59,7 +55,7 @@ function displayGames($phone, $leagueIndex) {
     return $msg;
 }
 
-// === Flow Logic ===
+// === USSD Flow ===
 if ($text == "") {
     echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
 
@@ -99,31 +95,33 @@ if ($text == "") {
         $game = loadData($phone, "selected_game");
         $choice = loadData($phone, "selected_choice");
 
-        // Logging start
         file_put_contents("debug_bet.txt", "Phone: $phone\nGame ID: {$game['id']}\nChoice: $choice\nStake: $stake\n", FILE_APPEND);
 
         if (!$game || !$choice) {
             echo "END Session expired. Start again.";
         } else {
             try {
+                // STK Push
+                $res = stkPush($phone, $stake, 'bet');
+                file_put_contents("debug_bet.txt", "✅ stkPush() sent\n", FILE_APPEND);
+
+                // Save bet to DB
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
-                file_put_contents("debug_bet.txt", "✅ placeBet() executed\n", FILE_APPEND);
+                file_put_contents("debug_bet.txt", "✅ placeBet() saved\n", FILE_APPEND);
 
-                deduct($pdo, $phone, $stake);
-                file_put_contents("debug_bet.txt", "✅ deduct() executed\n", FILE_APPEND);
-
+                // Log transaction
                 logTransaction($pdo, $phone, 'bet', $stake);
-                file_put_contents("debug_bet.txt", "✅ logTransaction() executed\n", FILE_APPEND);
+                file_put_contents("debug_bet.txt", "✅ logTransaction() recorded\n", FILE_APPEND);
 
-                // ✅ Send SMS confirmation
-                $message = "Popstar Bet: Your KES $stake bet on {$game['home']} vs {$game['away']} (option $choice) has been received.";
-                sendSMS($phone, $message);
+                // Send SMS
+                $msg = "Your KES $stake bet on {$game['home']} vs {$game['away']} has been initiated. Approve M-Pesa popup.";
+                sendSMS($phone, $msg);
                 file_put_contents("debug_bet.txt", "✅ SMS sent to $phone\n", FILE_APPEND);
 
-                echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
+                echo "END Please approve the KES $stake M-Pesa payment to complete your bet.";
             } catch (Exception $e) {
                 file_put_contents("debug_bet.txt", "❌ Error: " . $e->getMessage() . "\n", FILE_APPEND);
-                echo "END An error occurred. Please try again later.";
+                echo "END An error occurred. Please try again.";
             }
         }
     }
