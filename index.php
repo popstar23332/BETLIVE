@@ -2,7 +2,6 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
 header('Content-type: text/plain');
 
 $text = $_POST['text'] ?? '';
@@ -14,10 +13,9 @@ require_once 'mpesa.php';
 require_once 'football_api.php';
 require_once 'sms.php';
 
-// Ensure cache exists
+// === Local cache dir ===
 if (!is_dir("cache")) mkdir("cache");
 
-// Helpers
 function saveData($phone, $key, $data) {
     file_put_contents("cache/{$phone}_{$key}.json", json_encode($data));
 }
@@ -34,9 +32,7 @@ function showRecentBets($pdo, $phone) {
     $stmt = $pdo->prepare("SELECT * FROM bets WHERE user_phone = ? ORDER BY created_at DESC LIMIT 5");
     $stmt->execute([$phone]);
     $bets = $stmt->fetchAll();
-
     if (empty($bets)) return "END No bets placed yet.";
-
     $msg = "END Last 5 Bets:\n";
     foreach ($bets as $b) {
         $opt = match ($b['choice']) {
@@ -54,21 +50,18 @@ function displayLeagues($phone) {
     saveData($phone, "leagues", $leagues);
     $msg = "CON Choose League:\n";
     foreach ($leagues as $i => $name) {
-        $msg .= ($i + 1) . ". " . $name . "\n";
+        $msg .= ($i + 1) . ". $name\n";
     }
     return $msg;
 }
 function displayGames($phone, $leagueIndex) {
     $leagues = loadData($phone, "leagues");
     if (!isset($leagues[$leagueIndex])) return "END Invalid league selection.";
-
     $league = $leagues[$leagueIndex];
     $games = getGamesByLeague($league);
     if (empty($games)) return "END No games in $league.";
-
     saveData($phone, "games", $games);
     saveData($phone, "league", $league);
-
     $msg = "CON Choose Game:\n";
     foreach ($games as $i => $g) {
         $msg .= ($i + 1) . ". {$g['home']} vs {$g['away']}\n";
@@ -76,22 +69,22 @@ function displayGames($phone, $leagueIndex) {
     return $msg;
 }
 
-// === FLOW ===
-$registered = isRegistered($pdo, $phone);
+// === Flow ===
+$user = isRegistered($pdo, $phone);
 
 if ($text == "") {
-    if ($registered) {
-        echo "CON Main Menu:\n1. Place Bet\n2. Check My Bets";
-    } else {
-        echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
-    }
+    echo $user
+        ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets"
+        : "CON Welcome to Popstars Bet\nPlease enter your National ID:";
 
-} elseif (!$registered && count($steps) == 1) {
+} elseif (!$user && count($steps) == 1) {
     $id = $steps[0];
     $success = registerUser($pdo, $phone, $id);
-    echo $success ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets" : "END Registration failed. Try again.";
+    echo $success
+        ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets"
+        : "END Registration failed. Try again.";
 
-} elseif (count($steps) == 1 && $registered) {
+} elseif ($user && count($steps) == 1) {
     if ($steps[0] == "1") {
         echo displayLeagues($phone);
     } elseif ($steps[0] == "2") {
@@ -139,13 +132,13 @@ if ($text == "") {
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
                 logTransaction($pdo, $phone, 'bet', $stake);
 
-                $msg = "Popstar Bet: Your KES $stake bet on {$game['home']} vs {$game['away']} (option $choice) has been received.";
-                sendSMS($phone, $msg);
+                $message = "Popstar Bet: KES $stake placed on {$game['home']} vs {$game['away']} (option $choice). Good luck!";
+                sendSMS($phone, $message);
 
                 echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
             } catch (Exception $e) {
-                file_put_contents("debug_bet.txt", "❌ Error: " . $e->getMessage() . "\n", FILE_APPEND);
-                echo "END An error occurred. Try again later.";
+                echo "END Error. Please try again later.";
+                file_put_contents("debug_error.txt", $e->getMessage(), FILE_APPEND);
             }
         }
     }
