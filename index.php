@@ -22,7 +22,7 @@ function saveData($phone, $key, $data) {
 }
 function loadData($phone, $key) {
     $file = "cache/{$phone}_{$key}.json";
-    return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+    return file_exists($file) ? json_decode(file_get_contents($file), true) : null;
 }
 
 // Show 5 most recent bets
@@ -78,26 +78,41 @@ function displayGames($phone, $leagueIndex) {
 }
 
 // === USSD Flow ===
-if ($text == "") {
-    echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
+$userIdExists = loadData($phone, "user_id") !== null;
 
-} elseif (count($steps) == 1) {
+if ($text == "") {
+    if ($userIdExists) {
+        echo "CON Main Menu:\n1. Place Bet\n2. Check My Bets";
+    } else {
+        echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
+    }
+
+} elseif (count($steps) == 1 && !$userIdExists) {
     $id = $steps[0];
     $success = registerUser($pdo, $phone, $id);
-    echo $success ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets" : "END Registration failed. Try again.";
+    if ($success) {
+        saveData($phone, "user_id", $id);
+        echo "CON Main Menu:\n1. Place Bet\n2. Check My Bets";
+    } else {
+        echo "END Registration failed. Try again.";
+    }
 
-} elseif (count($steps) == 2 && $steps[1] == "1") {
-    echo displayLeagues($phone);
+} elseif ((count($steps) == 1 && $userIdExists) || (count($steps) == 2 && !$userIdExists)) {
+    $step = $userIdExists ? $steps[0] : $steps[1];
+    if ($step == "1") {
+        echo displayLeagues($phone);
+    } elseif ($step == "2") {
+        echo showRecentBets($pdo, $phone);
+    } else {
+        echo "END Invalid option.";
+    }
 
-} elseif (count($steps) == 2 && $steps[1] == "2") {
-    echo showRecentBets($pdo, $phone);
-
-} elseif (count($steps) == 3) {
-    $leagueIndex = intval($steps[2]) - 1;
+} elseif ((count($steps) == 2 && $userIdExists) || (count($steps) == 3 && !$userIdExists)) {
+    $leagueIndex = intval($userIdExists ? $steps[1] : $steps[2]) - 1;
     echo displayGames($phone, $leagueIndex);
 
-} elseif (count($steps) == 4) {
-    $gameIndex = intval($steps[3]) - 1;
+} elseif ((count($steps) == 3 && $userIdExists) || (count($steps) == 4 && !$userIdExists)) {
+    $gameIndex = intval($userIdExists ? $steps[2] : $steps[3]) - 1;
     $games = loadData($phone, "games");
     if (!isset($games[$gameIndex])) {
         echo "END Invalid game.";
@@ -106,8 +121,8 @@ if ($text == "") {
         echo "CON Predict outcome:\n1. Home Win\n2. Draw\n3. Away Win";
     }
 
-} elseif (count($steps) == 5) {
-    $choice = intval($steps[4]);
+} elseif ((count($steps) == 4 && $userIdExists) || (count($steps) == 5 && !$userIdExists)) {
+    $choice = intval($userIdExists ? $steps[3] : $steps[4]);
     if (!in_array($choice, [1, 2, 3])) {
         echo "END Invalid prediction.";
     } else {
@@ -115,8 +130,8 @@ if ($text == "") {
         echo "CON Enter stake amount (max KES 5000):";
     }
 
-} elseif (count($steps) == 6) {
-    $stake = intval($steps[5]);
+} elseif ((count($steps) == 5 && $userIdExists) || (count($steps) == 6 && !$userIdExists)) {
+    $stake = intval($userIdExists ? $steps[4] : $steps[5]);
     if ($stake <= 0 || $stake > 5000) {
         echo "END Invalid stake amount.";
     } else {
@@ -131,8 +146,8 @@ if ($text == "") {
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
                 logTransaction($pdo, $phone, 'bet', $stake);
 
-                $message = "Popstar Bet: Your KES $stake bet on {$game['home']} vs {$game['away']} (option $choice) has been received.";
-                sendSMS($phone, $message);
+                $msg = "Popstar Bet: Your KES $stake bet on {$game['home']} vs {$game['away']} (option $choice) has been received.";
+                sendSMS($phone, $msg);
 
                 echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
             } catch (Exception $e) {
@@ -145,4 +160,3 @@ if ($text == "") {
 } else {
     echo "END Invalid input.";
 }
-?>
