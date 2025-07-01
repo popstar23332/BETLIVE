@@ -68,7 +68,7 @@ function getMatchResult($gameId) {
     return 2; // Draw
 }
 
-// ✅ New: Static list of supported leagues (order matters for menu)
+// ✅ List of supported leagues
 function getLeagues() {
     return [
         "Premier League",
@@ -79,10 +79,27 @@ function getLeagues() {
     ];
 }
 
-// ✅ New: Filter today's games by league name
+// ✅ Return dummy games per league for testing
 function getGamesByLeague($leagueName) {
-    $games = getTodaysGames();
-    return array_values(array_filter($games, function($g) use ($leagueName) {
-        return $g['league'] === $leagueName;
-    }));
+    $dummyGames = [
+        "Premier League" => [
+            ["id" => "test1", "home" => "Arsenal", "away" => "Chelsea"],
+            ["id" => "test2", "home" => "Liverpool", "away" => "Man City"]
+        ],
+        "La Liga" => [
+            ["id" => "test3", "home" => "Barcelona", "away" => "Real Madrid"],
+            ["id" => "test4", "home" => "Atletico", "away" => "Sevilla"]
+        ],
+        "Serie A" => [
+            ["id" => "test5", "home" => "Juventus", "away" => "Napoli"]
+        ],
+        "Bundesliga" => [
+            ["id" => "test6", "home" => "Bayern", "away" => "Dortmund"]
+        ],
+        "Kenya Premier League" => [
+            ["id" => "test7", "home" => "Gor Mahia", "away" => "AFC Leopards"]
+        ]
+    ];
+
+    return $dummyGames[$leagueName] ?? [];
 }
