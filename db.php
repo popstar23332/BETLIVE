@@ -19,14 +19,20 @@ try {
     exit("END DB Error: " . $e->getMessage());
 }
 
-// ✅ Registration logic with logging
+// ✅ Registration logic with user info return
 function registerUser($pdo, $phone, $idNumber) {
     try {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE phone = ?");
         $stmt->execute([$phone]);
-        if ($stmt->rowCount() > 0) {
+        $user = $stmt->fetch();
+
+        if ($user) {
             file_put_contents("debug_register.txt", "Already exists: $phone\n", FILE_APPEND);
-            return true;
+            return [
+                "status" => "exists",
+                "user_number" => $user['user_number'],
+                "id" => $user['national_id']
+            ];
         }
 
         $stmt = $pdo->query("SELECT MAX(user_number) AS max_num FROM users");
@@ -37,26 +43,29 @@ function registerUser($pdo, $phone, $idNumber) {
         $stmt->execute([$phone, $idNumber, $newUserNumber]);
 
         file_put_contents("debug_register.txt", "Registered: $phone - $idNumber\n", FILE_APPEND);
-        return true;
+        return [
+            "status" => "new",
+            "user_number" => $newUserNumber,
+            "id" => $idNumber
+        ];
     } catch (Exception $e) {
         file_put_contents("debug_register.txt", "Error: " . $e->getMessage() . "\n", FILE_APPEND);
         return false;
     }
 }
 
-// ✅ NEW: placeBet() with debug
+// ✅ Log bet
 function placeBet($pdo, $phone, $gameId, $choice, $stake) {
     try {
         $stmt = $pdo->prepare("INSERT INTO bets (user_phone, game_id, choice, stake, created_at) VALUES (?, ?, ?, ?, NOW())");
         $stmt->execute([$phone, $gameId, $choice, $stake]);
-
         file_put_contents("debug_bet.txt", "✅ placeBet: Bet inserted\n", FILE_APPEND);
     } catch (Exception $e) {
         file_put_contents("debug_bet.txt", "❌ placeBet ERROR: " . $e->getMessage() . "\n", FILE_APPEND);
     }
 }
 
-// ✅ NEW: deduct() from winnings
+// ✅ Deduct from winnings
 function deduct($pdo, $phone, $amount) {
     try {
         $stmt = $pdo->prepare("UPDATE users SET winnings = winnings - ? WHERE phone = ? AND winnings >= ?");
