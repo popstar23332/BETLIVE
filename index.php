@@ -81,17 +81,16 @@ function displayGames($phone, $leagueIndex) {
 $userIdExists = loadData($phone, "user_id") !== null;
 
 if ($text == "") {
-    if ($userIdExists) {
-        echo "CON Main Menu:\n1. Place Bet\n2. Check My Bets";
-    } else {
-        echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
-    }
+    echo $userIdExists
+        ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets"
+        : "CON Welcome to Popstars Bet\nPlease enter your National ID:";
 
 } elseif (count($steps) == 1 && !$userIdExists) {
     $id = $steps[0];
-    $success = registerUser($pdo, $phone, $id);
-    if ($success) {
-        saveData($phone, "user_id", $id);
+    $reg = registerUser($pdo, $phone, $id);
+
+    if ($reg && is_array($reg)) {
+        saveData($phone, "user_id", $reg['id']);
         echo "CON Main Menu:\n1. Place Bet\n2. Check My Bets";
     } else {
         echo "END Registration failed. Try again.";
@@ -99,6 +98,7 @@ if ($text == "") {
 
 } elseif ((count($steps) == 1 && $userIdExists) || (count($steps) == 2 && !$userIdExists)) {
     $step = $userIdExists ? $steps[0] : $steps[1];
+
     if ($step == "1") {
         echo displayLeagues($phone);
     } elseif ($step == "2") {
@@ -114,6 +114,7 @@ if ($text == "") {
 } elseif ((count($steps) == 3 && $userIdExists) || (count($steps) == 4 && !$userIdExists)) {
     $gameIndex = intval($userIdExists ? $steps[2] : $steps[3]) - 1;
     $games = loadData($phone, "games");
+
     if (!isset($games[$gameIndex])) {
         echo "END Invalid game.";
     } else {
@@ -142,6 +143,7 @@ if ($text == "") {
             echo "END Session expired. Start again.";
         } else {
             try {
+                // Trigger M-Pesa STK Push
                 stkPush($phone, $stake, 'bet');
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
                 logTransaction($pdo, $phone, 'bet', $stake);
