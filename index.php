@@ -107,17 +107,22 @@ if ($text == "") {
         } else {
             try {
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
-                file_put_contents("debug_bet.txt", "placeBet() executed\n", FILE_APPEND);
+                file_put_contents("debug_bet.txt", "✅ placeBet() executed\n", FILE_APPEND);
 
                 deduct($pdo, $phone, $stake);
-                file_put_contents("debug_bet.txt", "deduct() executed\n", FILE_APPEND);
+                file_put_contents("debug_bet.txt", "✅ deduct() executed\n", FILE_APPEND);
 
                 logTransaction($pdo, $phone, 'bet', $stake);
-                file_put_contents("debug_bet.txt", "logTransaction() executed\n", FILE_APPEND);
+                file_put_contents("debug_bet.txt", "✅ logTransaction() executed\n", FILE_APPEND);
+
+                // ✅ Send SMS confirmation
+                $message = "Popstar Bet: Your KES $stake bet on {$game['home']} vs {$game['away']} (option $choice) has been received.";
+                sendSMS($phone, $message);
+                file_put_contents("debug_bet.txt", "✅ SMS sent to $phone\n", FILE_APPEND);
 
                 echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
             } catch (Exception $e) {
-                file_put_contents("debug_bet.txt", "Error: " . $e->getMessage() . "\n", FILE_APPEND);
+                file_put_contents("debug_bet.txt", "❌ Error: " . $e->getMessage() . "\n", FILE_APPEND);
                 echo "END An error occurred. Please try again later.";
             }
         }
