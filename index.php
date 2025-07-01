@@ -99,13 +99,27 @@ if ($text == "") {
         $game = loadData($phone, "selected_game");
         $choice = loadData($phone, "selected_choice");
 
+        // Logging start
+        file_put_contents("debug_bet.txt", "Phone: $phone\nGame ID: {$game['id']}\nChoice: $choice\nStake: $stake\n", FILE_APPEND);
+
         if (!$game || !$choice) {
             echo "END Session expired. Start again.";
         } else {
-            placeBet($pdo, $phone, $game['id'], $choice, $stake);
-            deduct($pdo, $phone, $stake);
-            logTransaction($pdo, $phone, 'bet', $stake);
-            echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
+            try {
+                placeBet($pdo, $phone, $game['id'], $choice, $stake);
+                file_put_contents("debug_bet.txt", "placeBet() executed\n", FILE_APPEND);
+
+                deduct($pdo, $phone, $stake);
+                file_put_contents("debug_bet.txt", "deduct() executed\n", FILE_APPEND);
+
+                logTransaction($pdo, $phone, 'bet', $stake);
+                file_put_contents("debug_bet.txt", "logTransaction() executed\n", FILE_APPEND);
+
+                echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
+            } catch (Exception $e) {
+                file_put_contents("debug_bet.txt", "Error: " . $e->getMessage() . "\n", FILE_APPEND);
+                echo "END An error occurred. Please try again later.";
+            }
         }
     }
 
