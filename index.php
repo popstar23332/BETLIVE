@@ -3,9 +3,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Log request for debugging
-file_put_contents("ussd_debug.txt", date("Y-m-d H:i:s") . " " . print_r($_POST, true), FILE_APPEND);
-
 header('Content-type: text/plain');
 
 $text = $_POST['text'] ?? '';
@@ -19,6 +16,7 @@ require_once 'sms.php';
 
 if (!is_dir("cache")) mkdir("cache");
 
+// Cache helpers
 function saveData($phone, $key, $data) {
     file_put_contents("cache/{$phone}_{$key}.json", json_encode($data));
 }
@@ -27,9 +25,32 @@ function loadData($phone, $key) {
     return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
 }
 
+// Display recent 5 bets
+function showRecentBets($pdo, $phone) {
+    $stmt = $pdo->prepare("SELECT * FROM bets WHERE user_phone = ? ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute([$phone]);
+    $bets = $stmt->fetchAll();
+
+    if (empty($bets)) return "END No bets placed yet.";
+
+    $msg = "END Last 5 Bets:\n";
+    foreach ($bets as $b) {
+        $opt = match ($b['choice']) {
+            1 => 'Win',
+            2 => 'Draw',
+            3 => 'Lose',
+            default => 'N/A'
+        };
+        $msg .= "{$b['game_id']} | $opt | KES {$b['stake']}\n";
+    }
+    return $msg;
+}
+
+// Menu builders
 function displayLeagues($phone) {
     $leagues = getLeagues();
     saveData($phone, "leagues", $leagues);
+
     $msg = "CON Choose League:\n";
     foreach ($leagues as $i => $name) {
         $msg .= ($i + 1) . ". " . $name . "\n";
@@ -55,21 +76,27 @@ function displayGames($phone, $leagueIndex) {
     return $msg;
 }
 
-// === USSD Flow ===
+// === Flow ===
 if ($text == "") {
     echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
 
 } elseif (count($steps) == 1) {
     $id = $steps[0];
     $success = registerUser($pdo, $phone, $id);
-    echo $success ? displayLeagues($phone) : "END Registration failed. Try again.";
+    echo $success ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets" : "END Registration failed. Try again.";
 
-} elseif (count($steps) == 2) {
-    $leagueIndex = intval($steps[1]) - 1;
-    echo displayGames($phone, $leagueIndex);
+} elseif (count($steps) == 2 && $steps[1] == "1") {
+    echo displayLeagues($phone);
+
+} elseif (count($steps) == 2 && $steps[1] == "2") {
+    echo showRecentBets($pdo, $phone);
 
 } elseif (count($steps) == 3) {
-    $gameIndex = intval($steps[2]) - 1;
+    $leagueIndex = intval($steps[2]) - 1;
+    echo displayGames($phone, $leagueIndex);
+
+} elseif (count($steps) == 4) {
+    $gameIndex = intval($steps[3]) - 1;
     $games = loadData($phone, "games");
     if (!isset($games[$gameIndex])) {
         echo "END Invalid game.";
@@ -78,8 +105,8 @@ if ($text == "") {
         echo "CON Predict outcome:\n1. Home Win\n2. Draw\n3. Away Win";
     }
 
-} elseif (count($steps) == 4) {
-    $choice = intval($steps[3]);
+} elseif (count($steps) == 5) {
+    $choice = intval($steps[4]);
     if (!in_array($choice, [1, 2, 3])) {
         echo "END Invalid prediction.";
     } else {
@@ -87,41 +114,31 @@ if ($text == "") {
         echo "CON Enter stake amount (max KES 5000):";
     }
 
-} elseif (count($steps) == 5) {
-    $stake = intval($steps[4]);
+} elseif (count($steps) == 6) {
+    $stake = intval($steps[5]);
     if ($stake <= 0 || $stake > 5000) {
         echo "END Invalid stake amount.";
     } else {
         $game = loadData($phone, "selected_game");
         $choice = loadData($phone, "selected_choice");
 
-        file_put_contents("debug_bet.txt", "Phone: $phone\nGame ID: {$game['id']}\nChoice: $choice\nStake: $stake\n", FILE_APPEND);
-
         if (!$game || !$choice) {
             echo "END Session expired. Start again.";
         } else {
             try {
-                // STK Push
-                $res = stkPush($phone, $stake, 'bet');
-                file_put_contents("debug_bet.txt", "✅ stkPush() sent\n", FILE_APPEND);
+                // Trigger M-Pesa STK Push instead of deduct()
+                stkPush($phone, $stake, 'bet');
 
-                // Save bet to DB
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
-                file_put_contents("debug_bet.txt", "✅ placeBet() saved\n", FILE_APPEND);
-
-                // Log transaction
                 logTransaction($pdo, $phone, 'bet', $stake);
-                file_put_contents("debug_bet.txt", "✅ logTransaction() recorded\n", FILE_APPEND);
 
-                // Send SMS
-                $msg = "Your KES $stake bet on {$game['home']} vs {$game['away']} has been initiated. Approve M-Pesa popup.";
-                sendSMS($phone, $msg);
-                file_put_contents("debug_bet.txt", "✅ SMS sent to $phone\n", FILE_APPEND);
+                $message = "Popstar Bet: Your KES $stake bet on {$game['home']} vs {$game['away']} (option $choice) has been received.";
+                sendSMS($phone, $message);
 
-                echo "END Please approve the KES $stake M-Pesa payment to complete your bet.";
+                echo "END Bet placed on {$game['home']} vs {$game['away']}.\nStake: KES $stake";
             } catch (Exception $e) {
                 file_put_contents("debug_bet.txt", "❌ Error: " . $e->getMessage() . "\n", FILE_APPEND);
-                echo "END An error occurred. Please try again.";
+                echo "END An error occurred. Try again later.";
             }
         }
     }
@@ -129,3 +146,4 @@ if ($text == "") {
 } else {
     echo "END Invalid input.";
 }
+?>
