@@ -1,10 +1,9 @@
 <?php
-// ✅ Debug mode (disable when live)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// ✅ Log all inputs
+// Log request for debugging
 file_put_contents("ussd_debug.txt", date("Y-m-d H:i:s") . " " . print_r($_POST, true), FILE_APPEND);
 
 header('Content-type: text/plain');
@@ -18,20 +17,19 @@ require_once 'mpesa.php';
 require_once 'football_api.php';
 require_once 'sms.php';
 
-// 📁 Ensure cache directory exists
+// Ensure cache directory exists
 if (!is_dir("cache")) mkdir("cache");
 
-// === Helper functions for file cache ===
+// === Cache Helpers ===
 function saveData($phone, $key, $data) {
     file_put_contents("cache/{$phone}_{$key}.json", json_encode($data));
 }
-
 function loadData($phone, $key) {
     $file = "cache/{$phone}_{$key}.json";
     return file_exists($file) ? json_decode(file_get_contents($file), true) : [];
 }
 
-// === League List ===
+// === Menu Builders ===
 function displayLeagues($phone) {
     $leagues = getLeagues();
     saveData($phone, "leagues", $leagues);
@@ -43,7 +41,6 @@ function displayLeagues($phone) {
     return $msg;
 }
 
-// === Game List for Selected League ===
 function displayGames($phone, $leagueIndex) {
     $leagues = loadData($phone, "leagues");
     if (!isset($leagues[$leagueIndex])) return "END Invalid league selection.";
@@ -62,24 +59,21 @@ function displayGames($phone, $leagueIndex) {
     return $msg;
 }
 
-// === USSD Flow Handler ===
+// === Flow Logic ===
 if ($text == "") {
-    echo "CON Welcome to Popstars Bet\n1. Log In";
+    echo "CON Welcome to Popstars Bet\nPlease enter your National ID:";
 
-} elseif ($steps[0] == "1" && count($steps) == 1) {
-    echo "CON Enter your National ID:";
-
-} elseif ($steps[0] == "1" && count($steps) == 2) {
-    $id = $steps[1];
+} elseif (count($steps) == 1) {
+    $id = $steps[0];
     $success = registerUser($pdo, $phone, $id);
     echo $success ? displayLeagues($phone) : "END Registration failed. Try again.";
 
-} elseif ($steps[0] == "1" && count($steps) == 3) {
-    $leagueIndex = intval($steps[2]) - 1;
+} elseif (count($steps) == 2) {
+    $leagueIndex = intval($steps[1]) - 1;
     echo displayGames($phone, $leagueIndex);
 
-} elseif ($steps[0] == "1" && count($steps) == 4) {
-    $gameIndex = intval($steps[3]) - 1;
+} elseif (count($steps) == 3) {
+    $gameIndex = intval($steps[2]) - 1;
     $games = loadData($phone, "games");
     if (!isset($games[$gameIndex])) {
         echo "END Invalid game.";
@@ -88,8 +82,8 @@ if ($text == "") {
         echo "CON Predict outcome:\n1. Home Win\n2. Draw\n3. Away Win";
     }
 
-} elseif ($steps[0] == "1" && count($steps) == 5) {
-    $choice = intval($steps[4]);
+} elseif (count($steps) == 4) {
+    $choice = intval($steps[3]);
     if (!in_array($choice, [1, 2, 3])) {
         echo "END Invalid prediction.";
     } else {
@@ -97,8 +91,8 @@ if ($text == "") {
         echo "CON Enter stake amount (max KES 5000):";
     }
 
-} elseif ($steps[0] == "1" && count($steps) == 6) {
-    $stake = intval($steps[5]);
+} elseif (count($steps) == 5) {
+    $stake = intval($steps[4]);
     if ($stake <= 0 || $stake > 5000) {
         echo "END Invalid stake amount.";
     } else {
