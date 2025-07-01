@@ -91,10 +91,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['withdrawal_id'])) {
             text-align: center;
             color: green;
         }
+
+        .logout {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .logout a {
+            color: red;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
 <div class="nav">
     <a href="admin_user_summary.php">📊 User Summary Report</a>
+    <a href="admin_bets.php">🔎 View All Bets</a>
     <a href="daily_report.php">📄 Daily PDF Report</a>
+</div>
+
+<h2>Pending Withdrawals Above KES <?= $auto_limit ?></h2>
+
+<?php if (!empty($withdrawal_approved)): ?>
+    <p class="notice">✅ Withdrawal approved and sent via M-Pesa.</p>
+<?php endif; ?>
+
+<form method="POST">
+    <?php
+    $pending = $pdo->prepare("SELECT * FROM withdrawals WHERE status = 'pending' AND amount > ?");
+    $pending->execute([$auto_limit]);
+    $pending_withdrawals = $pending->fetchAll();
+
+    foreach ($pending_withdrawals as $w): ?>
+        <p style="text-align: center;">
+            <?= htmlspecialchars($w['phone']) ?> - KES <?= number_format($w['amount']) ?>
+            <button name="withdrawal_id" value="<?= $w['id'] ?>">Approve</button>
+        </p>
+    <?php endforeach; ?>
+</form>
+
+<div class="logout">
+    <p><a href="logout.php">🚪 Logout</a></p>
+</div>
+
+</body>
+</html>
