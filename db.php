@@ -43,4 +43,32 @@ function registerUser($pdo, $phone, $idNumber) {
         return false;
     }
 }
+
+// ✅ NEW: placeBet() with debug
+function placeBet($pdo, $phone, $gameId, $choice, $stake) {
+    try {
+        $stmt = $pdo->prepare("INSERT INTO bets (user_phone, game_id, choice, stake, created_at) VALUES (?, ?, ?, ?, NOW())");
+        $stmt->execute([$phone, $gameId, $choice, $stake]);
+
+        file_put_contents("debug_bet.txt", "✅ placeBet: Bet inserted\n", FILE_APPEND);
+    } catch (Exception $e) {
+        file_put_contents("debug_bet.txt", "❌ placeBet ERROR: " . $e->getMessage() . "\n", FILE_APPEND);
+    }
+}
+
+// ✅ NEW: deduct() from winnings
+function deduct($pdo, $phone, $amount) {
+    try {
+        $stmt = $pdo->prepare("UPDATE users SET winnings = winnings - ? WHERE phone = ? AND winnings >= ?");
+        $stmt->execute([$amount, $phone, $amount]);
+
+        if ($stmt->rowCount() === 0) {
+            file_put_contents("debug_bet.txt", "❌ deduct: Not enough balance for $phone\n", FILE_APPEND);
+        } else {
+            file_put_contents("debug_bet.txt", "✅ deduct: KES $amount deducted from $phone\n", FILE_APPEND);
+        }
+    } catch (Exception $e) {
+        file_put_contents("debug_bet.txt", "❌ deduct ERROR: " . $e->getMessage() . "\n", FILE_APPEND);
+    }
+}
 ?>
