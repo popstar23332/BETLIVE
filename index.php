@@ -78,43 +78,25 @@ function displayGames($phone, $leagueIndex) {
 }
 
 // === USSD Flow ===
-$userIdExists = loadData($phone, "user_id") !== null;
-
 if ($text == "") {
-    echo $userIdExists
-        ? "CON Main Menu:\n1. Place Bet\n2. Check My Bets"
-        : "CON Welcome to Popstars Bet\nPlease enter your National ID:";
+    echo "CON Welcome, Double Chapaa na Popstars Bets\n1. Place Bet\n2. Check My Bets";
 
-} elseif (count($steps) == 1 && !$userIdExists) {
-    $id = $steps[0];
-    $reg = registerUser($pdo, $phone, $id);
-
-    if ($reg && is_array($reg)) {
-        saveData($phone, "user_id", $reg['id']);
-        echo "CON Main Menu:\n1. Place Bet\n2. Check My Bets";
-    } else {
-        echo "END Registration failed. Try again.";
-    }
-
-} elseif ((count($steps) == 1 && $userIdExists) || (count($steps) == 2 && !$userIdExists)) {
-    $step = $userIdExists ? $steps[0] : $steps[1];
-
-    if ($step == "1") {
+} elseif (count($steps) == 1) {
+    if ($steps[0] == "1") {
         echo displayLeagues($phone);
-    } elseif ($step == "2") {
+    } elseif ($steps[0] == "2") {
         echo showRecentBets($pdo, $phone);
     } else {
         echo "END Invalid option.";
     }
 
-} elseif ((count($steps) == 2 && $userIdExists) || (count($steps) == 3 && !$userIdExists)) {
-    $leagueIndex = intval($userIdExists ? $steps[1] : $steps[2]) - 1;
+} elseif (count($steps) == 2) {
+    $leagueIndex = intval($steps[1]) - 1;
     echo displayGames($phone, $leagueIndex);
 
-} elseif ((count($steps) == 3 && $userIdExists) || (count($steps) == 4 && !$userIdExists)) {
-    $gameIndex = intval($userIdExists ? $steps[2] : $steps[3]) - 1;
+} elseif (count($steps) == 3) {
+    $gameIndex = intval($steps[2]) - 1;
     $games = loadData($phone, "games");
-
     if (!isset($games[$gameIndex])) {
         echo "END Invalid game.";
     } else {
@@ -122,8 +104,8 @@ if ($text == "") {
         echo "CON Predict outcome:\n1. Home Win\n2. Draw\n3. Away Win";
     }
 
-} elseif ((count($steps) == 4 && $userIdExists) || (count($steps) == 5 && !$userIdExists)) {
-    $choice = intval($userIdExists ? $steps[3] : $steps[4]);
+} elseif (count($steps) == 4) {
+    $choice = intval($steps[3]);
     if (!in_array($choice, [1, 2, 3])) {
         echo "END Invalid prediction.";
     } else {
@@ -131,8 +113,8 @@ if ($text == "") {
         echo "CON Enter stake amount (max KES 5000):";
     }
 
-} elseif ((count($steps) == 5 && $userIdExists) || (count($steps) == 6 && !$userIdExists)) {
-    $stake = intval($userIdExists ? $steps[4] : $steps[5]);
+} elseif (count($steps) == 5) {
+    $stake = intval($steps[4]);
     if ($stake <= 0 || $stake > 5000) {
         echo "END Invalid stake amount.";
     } else {
@@ -143,7 +125,6 @@ if ($text == "") {
             echo "END Session expired. Start again.";
         } else {
             try {
-                // Trigger M-Pesa STK Push
                 stkPush($phone, $stake, 'bet');
                 placeBet($pdo, $phone, $game['id'], $choice, $stake);
                 logTransaction($pdo, $phone, 'bet', $stake);
